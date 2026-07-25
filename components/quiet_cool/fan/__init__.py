@@ -24,7 +24,7 @@ CONFIG_SCHEMA = fan.fan_schema(QuietCoolFan).extend(
     {
         cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(QuietCoolFan),
         cv.Required(CONF_GDO0_PIN                      ): cv.uint8_t,
-        cv.Required(CONF_GDO2_PIN                      ): cv.uint8_t,
+        cv.Optional(CONF_GDO2_PIN     , default=255    ): cv.uint8_t, # <--- Changed to Optional with 255 default
         cv.Required(CONF_REMOTE_ID                     ): cv.ensure_list(cv.hex_uint8_t),
         cv.Optional(CONF_FREQ_MHZ     , default=433.897): cv.float_,
         cv.Optional(CONF_DEVIATION_KHZ, default=10.0   ): cv.float_
