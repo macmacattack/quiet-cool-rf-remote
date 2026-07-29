@@ -39,8 +39,6 @@ async def to_code(config):
     await spi.register_spi_device(var, config)
 
     cs_num = config[spi.CONF_CS_PIN]["number"]
-    
-    # Pass ESP32-S3 Hardware SPI pins directly: CS=10, GDO0=14, GDO2=15, SCK=12, MISO=13, MOSI=11
-    cg.add(var.set_pins(cs_num, config[CONF_GDO0_PIN], config[CONF_GDO2_PIN], 12, 13, 11))
+    cg.add(var.set_pins(cs_num, config[CONF_GDO0_PIN], config[CONF_GDO2_PIN]))
     cg.add(var.set_remote_id(config[CONF_REMOTE_ID]))
     cg.add(var.set_frequencies(config[CONF_FREQ_MHZ], config[CONF_DEVIATION_KHZ]))
