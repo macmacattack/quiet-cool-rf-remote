@@ -21,13 +21,13 @@ const uint8_t SYNC[] = {0x15, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa};
 // MED: 0xA0    
 // HIGH:0xB0
 //
-//  1 hour: 0x01
-//  2 hour: 0x02
-//  4 hour: 0x04
-//  8 hour: 0x08
-// 12 hour: 0x0C
-//      on: 0x0F
-//     off: 0x00
+//   1 hour: 0x01
+//   2 hour: 0x02
+//   4 hour: 0x04
+//   8 hour: 0x08
+//  12 hour: 0x0C
+//       on: 0x0F
+//      off: 0x00
 //
 // the special command that's sent before anything else is 0x66.
 
@@ -36,7 +36,7 @@ const uint8_t SYNC[] = {0x15, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa};
 // 0x: 150aaaaaaaaaaaaaaaaTTUUVVWWXXYYZZGGGG
 // sync: always the same
 //   ID: unique identifier
-//   CD: command, as described above.  Two bytes duplicated.
+//   CD: command, as described above. Two bytes duplicated.
 
 // Helper: Convert bytes to a bit string (MSB first)
 static void bytesToBitString(const uint8_t* data, size_t len, char* bitstr, size_t maxlen) {
@@ -59,8 +59,8 @@ void QuietCool::logBits(const uint8_t* data, size_t len) {
 
     bitstr[0] = 0;
     for (size_t i = 0; i < len; i++) {
-	char bb[3];
-	snprintf(bb, 3, "%02X", data[i]);
+        char bb[3];
+        snprintf(bb, 3, "%02X", data[i]);
         strcat(bitstr, bb);
     }
     ESP_LOGD(TAG, "Bytes sent: %s", bitstr);
@@ -79,13 +79,13 @@ void QuietCool::sendRawData(const uint8_t* data, size_t len) {
 
 void QuietCool::sendPacket(const uint8_t cmd_code) {
     const uint8_t padding_len = 2;
-    uint8_t full_cmd[SYNC_LEN + 7 + CMD_CODE_LEN+padding_len];
+    uint8_t full_cmd[SYNC_LEN + 7 + CMD_CODE_LEN + padding_len];
     memset(full_cmd, 0, sizeof(full_cmd));
     memcpy(full_cmd, SYNC, SYNC_LEN);
     memcpy(full_cmd + SYNC_LEN, remote_id, 7);
     memcpy(full_cmd + SYNC_LEN + 7, &cmd_code, 1);
     memcpy(full_cmd + SYNC_LEN + 8, &cmd_code, 1);
-    size_t total_len = SYNC_LEN + 7 + CMD_CODE_LEN+padding_len;
+    size_t total_len = SYNC_LEN + 7 + CMD_CODE_LEN + padding_len;
     for (int i = 0; i < 3; i++) {
         sendRawData(full_cmd, total_len);
         delay(18);
@@ -101,8 +101,8 @@ const uint8_t QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration dura
     case QUIETCOOL_SPEED_LOW:
     break;
     default:
-	ESP_LOGD(TAG, "unknown speed: 0x%02x", speed);
-	return off;
+        ESP_LOGD(TAG, "unknown speed: 0x%02x", speed);
+        return off;
     };
 
     switch (duration) {
@@ -115,15 +115,15 @@ const uint8_t QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration dura
     case QUIETCOOL_DURATION_OFF :
     break;
     default:
-	ESP_LOGD(TAG, "unknown duration: 0x%02x", duration);
-	return off;
+        ESP_LOGD(TAG, "unknown duration: 0x%02x", duration);
+        return off;
     }
     uint8_t result = speed | duration;
     ESP_LOGD(TAG, "Sending speed=0x%02x, duration=0x%02x: 0x%02x", speed, duration, result);
     return result;
 }
 
-    QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in, float center_freq, float deviation_khz) : 
+QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8_t miso, uint8_t mosi, const uint8_t* remote_id_in, float center_freq, float deviation_khz) : 
     csn_pin(csn),
     gdo0_pin(gdo0),
     gdo2_pin(gdo2),
@@ -138,7 +138,9 @@ const uint8_t QuietCool::getCommand(QuietCoolSpeed speed, QuietCoolDuration dura
 
 // --- Initialize CC1101 and verify communication ---
 bool QuietCool::initCC1101() {
-    ESP_LOGD(TAG, "sck:%d, miso:%d, mosi:%d, csn:%d, gdo0:%d\n", sck_pin, miso_pin, mosi_pin, csn_pin, gdo0_pin);
+    ESP_LOGD(TAG, "Configuring SPI Pins -> SCK:%d, MISO:%d, MOSI:%d, CSN:%d, GDO0:%d, GDO2:%d\n", sck_pin, miso_pin, mosi_pin, csn_pin, gdo0_pin, gdo2_pin);
+    
+    // Set exact hardware SPI pins for ESP32-S3
     ELECHOUSE_cc1101.setSpiPin(sck_pin, miso_pin, mosi_pin, csn_pin);
 
     int tries = 10;
@@ -151,6 +153,7 @@ bool QuietCool::initCC1101() {
             detected = true;
             break;
         }
+        delay(10);
     }
 
     if (!detected) {
@@ -163,12 +166,12 @@ bool QuietCool::initCC1101() {
         return false;
     }
 
-    // ✅ Must set CC mode BEFORE Init so registers are configured correctly
+    // Must set CC mode BEFORE Init so registers are configured correctly
     ELECHOUSE_cc1101.setCCMode(1);
     ELECHOUSE_cc1101.Init();
 
-    ESP_LOGE(TAG, "Setting GDO0 pin to %d", gdo0_pin);
-    ELECHOUSE_cc1101.setGDO0(gdo0_pin);
+    ESP_LOGE(TAG, "Setting GDO0 pin to %d, GDO2 pin to %d", gdo0_pin, gdo2_pin);
+    ELECHOUSE_cc1101.setGDO(gdo0_pin, gdo2_pin);
 
     // Basic configuration
     ESP_LOGE(TAG, "Setting center frequency to %f MHz", center_freq_mhz);
@@ -177,7 +180,7 @@ bool QuietCool::initCC1101() {
 
     // Packet-related configuration
     ELECHOUSE_cc1101.setModulation(0);       // FSK
-    ESP_LOGI(TAG, "Setting deviaion to %f kHz.  That's a total spread of %f kHz", deviation_khz, 2*deviation_khz);
+    ESP_LOGI(TAG, "Setting deviation to %f kHz. That's a total spread of %f kHz", deviation_khz, 2 * deviation_khz);
     ELECHOUSE_cc1101.setDeviation(deviation_khz);
     ELECHOUSE_cc1101.setDRate(2.398);
     ELECHOUSE_cc1101.setSyncMode(0);
@@ -192,6 +195,7 @@ bool QuietCool::initCC1101() {
     delay(500);
     return true;
 }
+
 uint8_t QuietCool::readChipVersion() {
     return ELECHOUSE_cc1101.SpiReadReg(0xF1);
 }
@@ -206,11 +210,11 @@ void QuietCool::begin() {
 }
 
 void QuietCool::send(QuietCoolSpeed speed, QuietCoolDuration duration) {
-    ESP_LOGI(TAG, "send(0x%02x, %0x%02x)", speed, duration);
+    ESP_LOGI(TAG, "send(0x%02x, 0x%02x)", speed, duration);
     const uint8_t cmd_code = getCommand(speed, duration);
     ESP_LOGI(TAG, "cmd=%02x ", cmd_code);
     sendPacket(cmd_code);
 }
 
 }  // namespace quiet_cool
-}  // namespace esphome 
+}  // namespace esphome
