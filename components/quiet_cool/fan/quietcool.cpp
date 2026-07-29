@@ -2,6 +2,7 @@
 typedef uint8_t byte;
 #include "quietcool.h"
 #include "esphome/core/log.h"
+#include "esphome/core/application.h"
 #include "ELECHOUSE_CC1101_SRC_DRV.h"
 #include <cstring>
 
@@ -16,29 +17,6 @@ const uint8_t SYNC[] = {0x15, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa};
 
 #define CMD_CODE_LEN 2
 
-// Commands are structured like this:
-// LOW: 0x90
-// MED: 0xA0    
-// HIGH:0xB0
-//
-//   1 hour: 0x01
-//   2 hour: 0x02
-//   4 hour: 0x04
-//   8 hour: 0x08
-//  12 hour: 0x0C
-//       on: 0x0F
-//      off: 0x00
-//
-// the special command that's sent before anything else is 0x66.
-
-// So, final packet format is:
-//     <---- SYNC -------><--- ID -----><CD>
-// 0x: 150aaaaaaaaaaaaaaaaTTUUVVWWXXYYZZGGGG
-// sync: always the same
-//   ID: unique identifier
-//   CD: command, as described above. Two bytes duplicated.
-
-// Helper: Convert bytes to a bit string (MSB first)
 static void bytesToBitString(const uint8_t* data, size_t len, char* bitstr, size_t maxlen) {
     size_t idx = 0;
     for (size_t i = 0; i < len && idx + 8 < maxlen; i++) {
@@ -49,12 +27,10 @@ static void bytesToBitString(const uint8_t* data, size_t len, char* bitstr, size
     bitstr[idx] = '\0';
 }
 
-// Helper: Log the bits in a byte array (MSB first)
 void QuietCool::logBits(const uint8_t* data, size_t len) {
-    char bitstr[8 * 32 + 1]; // up to 32 bytes (256 bits)
+    char bitstr[8 * 32 + 1];
     bytesToBitString(data, len, bitstr, sizeof(bitstr));
     
-    // Print bytes in hex format
     ESP_LOGD(TAG, "Bits sent: %s", bitstr);
 
     bitstr[0] = 0;
@@ -88,6 +64,7 @@ void QuietCool::sendPacket(const uint8_t cmd_code) {
     size_t total_len = SYNC_LEN + 7 + CMD_CODE_LEN + padding_len;
     for (int i = 0; i < 3; i++) {
         sendRawData(full_cmd, total_len);
+        App.feed_wdt();
         delay(18);
     }
 }
@@ -136,51 +113,38 @@ QuietCool::QuietCool(uint8_t csn, uint8_t gdo0, uint8_t gdo2, uint8_t sck, uint8
     for (int i = 0; i < 7; ++i) remote_id[i] = remote_id_in[i];
 }
 
-// --- Initialize CC1101 and verify communication ---
 bool QuietCool::initCC1101() {
     ESP_LOGD(TAG, "Configuring SPI Pins -> SCK:%d, MISO:%d, MOSI:%d, CSN:%d, GDO0:%d, GDO2:%d\n", sck_pin, miso_pin, mosi_pin, csn_pin, gdo0_pin, gdo2_pin);
     
-    // Set exact hardware SPI pins for ESP32-S3
     ELECHOUSE_cc1101.setSpiPin(sck_pin, miso_pin, mosi_pin, csn_pin);
 
-    int tries = 10;
-    bool detected = false;
-    while (tries--) {
-        uint8_t version = readChipVersion();
-        ESP_LOGI(TAG, "CC1101 VERSION READ: 0x%02X", version);
-        if (version == 0x14 || version == 0x04) {
-            ESP_LOGI(TAG, "CC1101 detected!");
-            detected = true;
-            break;
-        }
-        delay(10);
-    }
-
-    if (!detected) {
+    uint8_t version = readChipVersion();
+    ESP_LOGI(TAG, "CC1101 VERSION READ: 0x%02X", version);
+    
+    if (version != 0x14 && version != 0x04) {
         ESP_LOGE(TAG, "CC1101 not detected!");
         return false;
     }
 
-    if (!ELECHOUSE_cc1101.getCC1101()) {
-        ESP_LOGE(TAG, "CC1101 connection error");
-        return false;
-    }
+    ESP_LOGI(TAG, "CC1101 detected!");
+    App.feed_wdt();
 
-    // Must set CC mode BEFORE Init so registers are configured correctly
+    // Initialize CC1101 hardware
     ELECHOUSE_cc1101.setCCMode(1);
     ELECHOUSE_cc1101.Init();
+    App.feed_wdt();
 
-    ESP_LOGE(TAG, "Setting GDO0 pin to %d, GDO2 pin to %d", gdo0_pin, gdo2_pin);
-    ELECHOUSE_cc1101.setGDO(gdo0_pin, gdo2_pin);
+    // Set GDO pins explicitly
+    if (gdo2_pin != 255) {
+        ELECHOUSE_cc1101.setGDO(gdo0_pin, gdo2_pin);
+    } else {
+        ELECHOUSE_cc1101.setGDO0(gdo0_pin);
+    }
 
-    // Basic configuration
-    ESP_LOGE(TAG, "Setting center frequency to %f MHz", center_freq_mhz);
+    // Configure frequency and transmission settings
     ELECHOUSE_cc1101.setMHZ(center_freq_mhz);
     ELECHOUSE_cc1101.setPA(0);
-
-    // Packet-related configuration
     ELECHOUSE_cc1101.setModulation(0);       // FSK
-    ESP_LOGI(TAG, "Setting deviation to %f kHz. That's a total spread of %f kHz", deviation_khz, 2 * deviation_khz);
     ELECHOUSE_cc1101.setDeviation(deviation_khz);
     ELECHOUSE_cc1101.setDRate(2.398);
     ELECHOUSE_cc1101.setSyncMode(0);
@@ -192,7 +156,7 @@ bool QuietCool::initCC1101() {
     ELECHOUSE_cc1101.setPacketLength(20);
     ELECHOUSE_cc1101.setPRE(0);
 
-    delay(500);
+    App.feed_wdt();
     return true;
 }
 
@@ -203,10 +167,10 @@ uint8_t QuietCool::readChipVersion() {
 void QuietCool::begin() {
     ESP_LOGI(TAG, "Starting CC1101 setup");
     if (!initCC1101()) {
-        ESP_LOGE(TAG, "CC1101 not detected");
+        ESP_LOGE(TAG, "CC1101 setup failed");
         return;
     }
-    ESP_LOGI(TAG, "CC1101 ready");
+    ESP_LOGI(TAG, "CC1101 setup complete and ready!");
 }
 
 void QuietCool::send(QuietCoolSpeed speed, QuietCoolDuration duration) {
