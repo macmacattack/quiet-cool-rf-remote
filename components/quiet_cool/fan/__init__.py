@@ -24,7 +24,7 @@ CONFIG_SCHEMA = fan.fan_schema(QuietCoolFan).extend(
     {
         cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(QuietCoolFan),
         cv.Required(CONF_GDO0_PIN                      ): cv.uint8_t,
-        cv.Optional(CONF_GDO2_PIN     , default=255    ): cv.uint8_t, # <--- Changed to Optional with 255 default
+        cv.Optional(CONF_GDO2_PIN     , default=255    ): cv.uint8_t,
         cv.Required(CONF_REMOTE_ID                     ): cv.ensure_list(cv.hex_uint8_t),
         cv.Optional(CONF_FREQ_MHZ     , default=433.897): cv.float_,
         cv.Optional(CONF_DEVIATION_KHZ, default=10.0   ): cv.float_
@@ -39,6 +39,8 @@ async def to_code(config):
     await spi.register_spi_device(var, config)
 
     cs_num = config[spi.CONF_CS_PIN]["number"]
-    cg.add(var.set_pins(cs_num, config[CONF_GDO0_PIN], config[CONF_GDO2_PIN]))
+    
+    # Pass ESP32-S3 Hardware SPI pins directly: CS=10, GDO0=14, GDO2=15, SCK=12, MISO=13, MOSI=11
+    cg.add(var.set_pins(cs_num, config[CONF_GDO0_PIN], config[CONF_GDO2_PIN], 12, 13, 11))
     cg.add(var.set_remote_id(config[CONF_REMOTE_ID]))
     cg.add(var.set_frequencies(config[CONF_FREQ_MHZ], config[CONF_DEVIATION_KHZ]))
