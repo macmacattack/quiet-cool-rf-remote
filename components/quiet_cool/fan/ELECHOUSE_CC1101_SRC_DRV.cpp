@@ -70,13 +70,13 @@ byte clb4[2]= {77,79};
 
 /****************************************************************/
 uint8_t PA_TABLE[8]     {0x00,0xC0,0x00,0x00,0x00,0x00,0x00,0x00};
-//                       -30  -20  -15  -10   0    5    7    10
+//                        -30  -20  -15  -10   0    5    7    10
 uint8_t PA_TABLE_315[8] {0x12,0x0D,0x1C,0x34,0x51,0x85,0xCB,0xC2,};             //300 - 348
 uint8_t PA_TABLE_433[8] {0x12,0x0E,0x1D,0x34,0x60,0x84,0xC8,0xC0,};             //387 - 464
 //                        -30  -20  -15  -10  -6    0    5    7    10   12
-uint8_t PA_TABLE_868[10] {0x03,0x17,0x1D,0x26,0x37,0x50,0x86,0xCD,0xC5,0xC0,};  //779 - 899.99
+uint8_t PA_TABLE_868[10] {0x03,0x17,0x1D,0x26,0x37,0x50,0x86,0xCD,xC5,xC0,};  //779 - 899.99
 //                        -30  -20  -15  -10  -6    0    5    7    10   11
-uint8_t PA_TABLE_915[10] {0x03,0x0E,0x1E,0x27,0x38,0x8E,0x84,0xCC,0xC3,0xC0,};  //900 - 928
+uint8_t PA_TABLE_915[10] {0x03,0x0E,0x1E,0x27,0x38,0x8E,0x84,0xCC,xC3,xC0,};  //900 - 928
 /****************************************************************
 *FUNCTION NAME:SpiStart
 *FUNCTION     :spi communication start
@@ -119,7 +119,9 @@ void ELECHOUSE_CC1101::SpiEnd(void)
 void ELECHOUSE_CC1101::GDO_Set (void)
 {
     pinMode(GDO0, OUTPUT);
-    pinMode(GDO2, INPUT);
+    if (GDO2 != 255) {
+      pinMode(GDO2, INPUT);
+    }
 }
 /****************************************************************
 *FUNCTION NAME: GDO_Set()
@@ -140,14 +142,13 @@ void ELECHOUSE_CC1101::GDO0_Set (void)
 void ELECHOUSE_CC1101::Reset (void)
 {
     digitalWrite(SS_PIN, LOW);
-    delay(1);
+    delayMicroseconds(10);
     digitalWrite(SS_PIN, HIGH);
-    delay(1);
-    digitalWrite(SS_PIN, LOW);
-    while(digitalRead(MISO_PIN));
-  SPI.transfer(CC1101_SRES);
-  while(digitalRead(MISO_PIN));
-    digitalWrite(SS_PIN, HIGH);
+    delayMicroseconds(40);
+
+    // Send CC1101_SRES reset strobe over SPI without manual digitalWrite calls on SPI bus pins
+    SpiStrobe(CC1101_SRES);
+    delay(10);
 }
 /****************************************************************
 *FUNCTION NAME:Init
@@ -158,12 +159,10 @@ void ELECHOUSE_CC1101::Reset (void)
 void ELECHOUSE_CC1101::Init(void)
 {
   setSpi();
-  SpiStart();                   //spi initialization
+  SpiStart();                  //spi initialization
   digitalWrite(SS_PIN, HIGH);
-  digitalWrite(SCK_PIN, HIGH);
-  digitalWrite(MOSI_PIN, LOW);
-  Reset();                    //CC1101 reset
-  RegConfigSettings();            //CC1101 register config
+  Reset();                     //CC1101 reset
+  RegConfigSettings();         //CC1101 register config
   SpiEnd();
 }
 /****************************************************************
