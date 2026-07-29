@@ -33,11 +33,17 @@ class QuietCoolFan : public Component, public fan::Fan, public spi::SPIDevice<sp
     // Instantiate QuietCool using ESP32-S3 Hardware SPI pins: SCK=12, MISO=13, MOSI=11
     this->qc_ = new QuietCool(this->csn_pin_, this->gdo0_pin_, this->gdo2_pin_, 12, 13, 11, this->remote_id_, this->center_freq_mhz_, this->deviation_khz_);
     this->qc_->begin();
+
+    // Publish initial OFF state to enable the Home Assistant UI controls
+    this->state = false;
+    this->speed = 3;
+    this->publish_state();
   }
 
   fan::FanTraits get_traits() override {
     auto traits = fan::FanTraits();
     traits.set_speed(true);
+    traits.set_supported_speed_count(3); // Explicitly state 3-speed fan (Low, Med, High)
     return traits;
   }
 
