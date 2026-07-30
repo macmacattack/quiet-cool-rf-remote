@@ -34,7 +34,7 @@ class QuietCoolFan : public Component, public fan::Fan, public spi::SPIDevice<sp
     this->qc_ = new QuietCool(this->csn_pin_, this->gdo0_pin_, this->gdo2_pin_, 12, 13, 11, this->remote_id_, this->center_freq_mhz_, this->deviation_khz_);
     this->qc_->begin();
 
-    // Publish initial OFF state to enable the Home Assistant UI controls
+    // Publish initial state to Home Assistant
     this->state = false;
     this->speed = 3;
     this->publish_state();
@@ -43,33 +43,38 @@ class QuietCoolFan : public Component, public fan::Fan, public spi::SPIDevice<sp
   fan::FanTraits get_traits() override {
     auto traits = fan::FanTraits();
     traits.set_speed(true);
-    traits.set_supported_speed_count(3); // Explicitly state 3-speed fan (Low, Med, High)
+    traits.set_supported_speed_count(3);
     return traits;
   }
 
   void control(const fan::FanCall &call) override {
     if (call.get_state().has_value()) {
-      bool state = *call.get_state();
-      if (!state) {
-        this->qc_->send(QUIETCOOL_SPEED_HIGH, QUIETCOOL_DURATION_OFF);
-        this->state = false;
-      } else {
-        this->state = true;
-      }
-    }
+      bool new_state = *call.get_state();
+      this->state = new_state;
 
-    if (call.get_speed().has_value()) {
-      int speed = *call.get_speed();
-      if (this->state) {
-        if (speed == 1) {
-          this->qc_->send(QUIETCOOL_SPEED_LOW, QUIETCOOL_DURATION_ON);
-        } else if (speed == 2) {
-          this->qc_->send(QUIETCOOL_SPEED_MEDIUM, QUIETCOOL_DURATION_ON);
-        } else {
-          this->qc_->send(QUIETCOOL_SPEED_HIGH, QUIETCOOL_DURATION_ON);
-        }
+      if (!new_state) {
+        // Send OFF command
+        this->qc_->send(QUIETCOOL_SPEED_HIGH, QUIETCOOL_DURATION_OFF);
+      } else {
+        // Send ON command using active speed
+        int speed_val = this->speed;
+        QuietCoolSpeed spd = QUIETCOOL_SPEED_HIGH;
+        if (speed_val == 1) spd = QUIETCOOL_SPEED_LOW;
+        else if (speed_val == 2) spd = QUIETCOOL_SPEED_MEDIUM;
+
+        this->qc_->send(spd, QUIETCOOL_DURATION_ON);
       }
-      this->speed = speed;
+    } else if (call.get_speed().has_value()) {
+      int speed_val = *call.get_speed();
+      this->speed = speed_val;
+
+      if (this->state) {
+        QuietCoolSpeed spd = QUIETCOOL_SPEED_HIGH;
+        if (speed_val == 1) spd = QUIETCOOL_SPEED_LOW;
+        else if (speed_val == 2) spd = QUIETCOOL_SPEED_MEDIUM;
+
+        this->qc_->send(spd, QUIETCOOL_DURATION_ON);
+      }
     }
     this->publish_state();
   }
