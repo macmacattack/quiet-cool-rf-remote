@@ -141,9 +141,9 @@ bool QuietCool::initCC1101() {
         ELECHOUSE_cc1101.setGDO0(gdo0_pin);
     }
 
-    // Configure frequency and transmission settings
+    // Configure frequency and max power settings (+10dBm)
     ELECHOUSE_cc1101.setMHZ(center_freq_mhz);
-    ELECHOUSE_cc1101.setPA(0);
+    ELECHOUSE_cc1101.setPA(10); 
     ELECHOUSE_cc1101.setModulation(0);       // FSK
     ELECHOUSE_cc1101.setDeviation(deviation_khz);
     ELECHOUSE_cc1101.setDRate(2.398);
